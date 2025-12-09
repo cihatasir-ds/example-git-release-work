@@ -24,7 +24,11 @@ function parseCommits(fromTag) {
 
   return output.split('\n').map((line) => {
     const match = line.match(COMMIT_REGEX);
-    if (!match) return null;
+    
+    if (!match) {
+      return null;
+    };
+
     const [, type, ticket, summary] = match;
     return { type, ticket, summary, raw: line };
   }).filter(Boolean);
