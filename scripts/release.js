@@ -1,11 +1,4 @@
 #!/usr/bin/env node
-/**
- * Local release automation:
- * - Reads commits since last tag
- * - Determines next semver (minor unless hotfix present -> patch)
- * - Writes release notes under releases/vX.Y.Z.md
- * - Creates annotated git tag
- */
 const { execSync } = require('child_process');
 const { mkdirSync, writeFileSync } = require('fs');
 const { join } = require('path');
@@ -28,6 +21,7 @@ function parseCommits(fromTag) {
   const range = fromTag ? `${fromTag}..HEAD` : 'HEAD';
   const output = run(`git log ${range} --pretty=format:%s`);
   if (!output) return [];
+
   return output.split('\n').map((line) => {
     const match = line.match(COMMIT_REGEX);
     if (!match) return null;
@@ -56,6 +50,7 @@ function formatSection(title, commits) {
   if (!commits || commits.length === 0) {
     return `## ${title}\n- (none)\n`;
   }
+
   const lines = commits.map((c) => `- ${c.raw} – ${c.summary}`);
   return `## ${title}\n${lines.join('\n')}\n`;
 }
@@ -74,8 +69,10 @@ function writeReleaseNotes(version, grouped) {
 
   const dir = join(process.cwd(), 'releases');
   mkdirSync(dir, { recursive: true });
+
   const filePath = join(dir, `${version}.md`);
   writeFileSync(filePath, content, 'utf8');
+  
   return filePath;
 }
 
@@ -99,4 +96,3 @@ function main() {
 }
 
 main();
-
