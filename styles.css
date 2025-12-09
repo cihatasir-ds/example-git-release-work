@@ -36,3 +36,9 @@ body {
   color: #2e86de;
 }
 
+.feature-list {
+  padding-left: 1.25rem;
+  line-height: 1.6;
+  color: #333;
+}
+
