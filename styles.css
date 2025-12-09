@@ -47,3 +47,12 @@ body {
   color: #555;
 }
 
+.contact-list {
+  padding-left: 1.25rem;
+  line-height: 1.6;
+}
+
+.contact-list li strong {
+  color: #1a1a1a;
+}
+
