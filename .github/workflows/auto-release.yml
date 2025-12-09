@@ -69,4 +69,3 @@ jobs:
           body_path: ${{ steps.notes.outputs.file }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
