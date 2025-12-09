@@ -3,7 +3,16 @@ const { execSync } = require('child_process');
 const { mkdirSync, writeFileSync } = require('fs');
 const { join } = require('path');
 
-const COMMIT_REGEX = /^(feat|fix|hotfix|chore|refactor)\(([A-Za-z]+-\d+)\):\s*(.+)$/;
+const COMMIT_REGEX = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert|hotfix|initial|dependencies|peerDependencies|devDependencies|metadata)\(([A-Za-z]+-\d+)\):\s*(.+)$/;
+
+// Alias mapping: aliases map to their canonical commit types
+const COMMIT_TYPE_ALIASES = {
+  initial: 'feat',
+  dependencies: 'fix',
+  peerDependencies: 'fix',
+  devDependencies: 'chore',
+  metadata: 'fix',
+};
 
 function run(cmd) {
   return execSync(cmd, { stdio: ['ignore', 'pipe', 'inherit'] }).toString().trim();
@@ -30,7 +39,9 @@ function parseCommits(fromTag) {
     };
 
     const [, type, ticket, summary] = match;
-    return { type, ticket, summary, raw: line };
+    // Map aliases to canonical types
+    const canonicalType = COMMIT_TYPE_ALIASES[type] || type;
+    return { type: canonicalType, ticket, summary, raw: line };
   }).filter(Boolean);
 }
 
@@ -61,10 +72,18 @@ function writeReleaseNotes(version, grouped) {
   const today = new Date();
   const date = today.toISOString().slice(0, 10);
   const sections = [
-    formatSection('🚀 Features', grouped.feat),
-    formatSection('🐛 Fixes', grouped.fix),
+    formatSection('✨ Features', grouped.feat),
+    formatSection('🐛 Bug Fixes', grouped.fix),
     formatSection('🔥 Hotfixes', grouped.hotfix),
-    formatSection('🛠 Chores / Refactors', [...(grouped.chore || []), ...(grouped.refactor || [])]),
+    formatSection('📚 Documentation', grouped.docs),
+    formatSection('💎 Styles', grouped.style),
+    formatSection('📦 Code Refactoring', grouped.refactor),
+    formatSection('🚀 Performance Improvements', grouped.perf),
+    formatSection('🚨 Tests', grouped.test),
+    formatSection('🛠 Builds', grouped.build),
+    formatSection('⚙️ Continuous Integrations', grouped.ci),
+    formatSection('♻️ Chores', grouped.chore),
+    formatSection('🗑 Reverts', grouped.revert),
   ].filter(Boolean);
 
   const content = [
