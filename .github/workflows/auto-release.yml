@@ -1,0 +1,72 @@
+name: Auto Release on Main
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write  # tag ve GitHub Release oluşturmak için
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (tüm geçmiş)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Node kurulumu
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Git kullanıcı bilgisi
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Önceki tag'i al
+        id: prev
+        run: |
+          if git describe --tags --abbrev=0 >/tmp/prev_tag 2>/dev/null; then
+            echo "prev=$(cat /tmp/prev_tag)" >> $GITHUB_OUTPUT
+          else
+            echo "prev=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Release scriptini çalıştır
+        id: run_release
+        run: |
+          node scripts/release.js
+
+      - name: Yeni tag'i al
+        id: newtag
+        run: |
+          echo "tag=$(git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
+
+      - name: Tag push
+        run: |
+          git push origin "$(git describe --tags --abbrev=0)"
+
+      - name: Release notu dosyası
+        id: notes
+        run: |
+          TAG="$(git describe --tags --abbrev=0)"
+          FILE="releases/${TAG}.md"
+          if [ ! -f "$FILE" ]; then
+            echo "Release notu bulunamadı: $FILE" >&2
+            exit 1
+          fi
+          echo "file=$FILE" >> $GITHUB_OUTPUT
+
+      - name: GitHub Release oluştur
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.newtag.outputs.tag }}
+          name: ${{ steps.newtag.outputs.tag }}
+          body_path: ${{ steps.notes.outputs.file }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
