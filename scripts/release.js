@@ -47,9 +47,7 @@ function groupCommits(commits) {
 }
 
 function formatSection(title, commits) {
-  if (!commits || commits.length === 0) {
-    return `## ${title}\n- (none)\n`;
-  }
+  if (!commits || commits.length === 0) return '';
 
   const lines = commits.map((c) => `- ${c.raw} – ${c.summary}`);
   return `## ${title}\n${lines.join('\n')}\n`;
@@ -58,13 +56,17 @@ function formatSection(title, commits) {
 function writeReleaseNotes(version, grouped) {
   const today = new Date();
   const date = today.toISOString().slice(0, 10);
-  const content = [
-    `# ${version} – ${date}`,
-    '',
+  const sections = [
     formatSection('🚀 Features', grouped.feat),
     formatSection('🐛 Fixes', grouped.fix),
     formatSection('🔥 Hotfixes', grouped.hotfix),
     formatSection('🛠 Chores / Refactors', [...(grouped.chore || []), ...(grouped.refactor || [])]),
+  ].filter(Boolean);
+
+  const content = [
+    `# ${version} – ${date}`,
+    '',
+    ...sections,
   ].join('\n');
 
   const dir = join(process.cwd(), 'releases');
