@@ -40,7 +40,7 @@ function getRepoUrl() {
 
 function parseCommits(fromTag, repoUrl) {
   const range = fromTag ? `${fromTag}..HEAD` : 'HEAD';
-  const output = run(`git log ${range} --pretty=format:%H|%s`);
+  const output = run(`git log ${range} --pretty=format:"%H|%s"`);
 
   if (!output) {
     return [];
