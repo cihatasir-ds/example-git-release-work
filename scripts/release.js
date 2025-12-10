@@ -26,6 +26,27 @@ function getLastTag() {
   }
 }
 
+function tagExists(tag) {
+  try {
+    run(`git rev-parse -q --verify refs/tags/${tag}`);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+function nextAvailableVersion(baseVersion) {
+  const [major, minor, patch] = baseVersion.replace(/^v/, '').split('.').map(Number);
+  
+  for (let candidatePatch = patch; ; candidatePatch += 1) {
+    const candidateTag = `v${major}.${minor}.${candidatePatch}`;
+
+    if (!tagExists(candidateTag)) {
+      return candidateTag;
+    }
+  }
+}
+
 function getRepoUrl() {
   const remote = run('git config --get remote.origin.url');
   const sshMatch = remote.match(/^git@([^:]+):(.+)$/);
@@ -140,7 +161,8 @@ function main() {
   }
 
   const hasHotfix = commits.some((c) => c.type === 'hotfix');
-  const nextVersion = bumpVersion(lastTag || 'v1.0.0', hasHotfix);
+  const bumpedVersion = bumpVersion(lastTag || 'v1.0.0', hasHotfix);
+  const nextVersion = nextAvailableVersion(bumpedVersion);
   const grouped = groupCommits(commits);
   const notesPath = writeReleaseNotes(nextVersion, grouped);
 
