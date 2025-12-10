@@ -41,7 +41,10 @@ function getRepoUrl() {
 function parseCommits(fromTag, repoUrl) {
   const range = fromTag ? `${fromTag}..HEAD` : 'HEAD';
   const output = run(`git log ${range} --pretty=format:%H|%s`);
-  if (!output) return [];
+
+  if (!output) {
+    return [];
+  };
 
   return output.split('\n').map((line) => {
     const [hash, subject] = line.split('|', 2);
@@ -55,7 +58,7 @@ function parseCommits(fromTag, repoUrl) {
     const canonicalType = COMMIT_TYPE_ALIASES[type] || type;
     const ticket = scope && /^[A-Za-z]+-\d+$/.test(scope) ? scope : null;
     const raw = scope ? `${type}(${scope}): ${summary}` : `${type}: ${summary}`;
-    
+
     return {
       type: canonicalType,
       ticket,
@@ -85,7 +88,9 @@ function groupCommits(commits) {
 }
 
 function formatSection(title, commits) {
-  if (!commits || commits.length === 0) return '';
+  if (!commits || commits.length === 0) {
+    return '';
+  };
 
   const lines = commits.map((c) => `- [${c.raw}](${c.url})`);
   return `## ${title}\n${lines.join('\n')}\n`;
