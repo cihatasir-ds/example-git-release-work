@@ -4,6 +4,10 @@ const { mkdirSync, writeFileSync } = require('fs');
 const { join } = require('path');
 
 const COMMIT_REGEX = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert|hotfix|initial|dependencies|peerDependencies|devDependencies|metadata)(?:\(([^)]*)\))?:\s*(.+)$/;
+const JIRA_BASE_URL = process.env.JIRA_BASE_URL || 'https://example.atlassian.net/browse/';
+
+// DELETE THIS SECTION: Remove this constant and all test release functions when v1 goes to production
+const isActiveTestRelease = true;
 
 // Alias mapping: aliases map to their canonical commit types
 const COMMIT_TYPE_ALIASES = {
@@ -14,16 +18,12 @@ const COMMIT_TYPE_ALIASES = {
   metadata: 'fix',
 };
 
+// ============================================================================
+// Common Functions (shared by both test and production releases)
+// ============================================================================
+
 function run(cmd) {
   return execSync(cmd, { stdio: ['ignore', 'pipe', 'inherit'] }).toString().trim();
-}
-
-function getLastTag() {
-  try {
-    return run('git describe --tags --abbrev=0');
-  } catch (err) {
-    return null;
-  }
 }
 
 function tagExists(tag) {
@@ -32,18 +32,6 @@ function tagExists(tag) {
     return true;
   } catch (err) {
     return false;
-  }
-}
-
-function nextAvailableVersion(baseVersion) {
-  const [major, minor, patch] = baseVersion.replace(/^v/, '').split('.').map(Number);
-  
-  for (let candidatePatch = patch; ; candidatePatch += 1) {
-    const candidateTag = `v${major}.${minor}.${candidatePatch}`;
-
-    if (!tagExists(candidateTag)) {
-      return candidateTag;
-    }
   }
 }
 
@@ -65,7 +53,7 @@ function parseCommits(fromTag, repoUrl) {
 
   if (!output) {
     return [];
-  };
+  }
 
   return output.split('\n').map((line) => {
     const [hash, subject] = line.split('|', 2);
@@ -73,7 +61,7 @@ function parseCommits(fromTag, repoUrl) {
     
     if (!match) {
       return null;
-    };
+    }
 
     const [, type, scope, summary] = match;
     const canonicalType = COMMIT_TYPE_ALIASES[type] || type;
@@ -92,14 +80,6 @@ function parseCommits(fromTag, repoUrl) {
   }).filter(Boolean);
 }
 
-function bumpVersion(current, hasHotfix) {
-  const [major, minor, patch] = current.replace(/^v/, '').split('.').map(Number);
-  if (hasHotfix) {
-    return `v${major}.${minor}.${patch + 1}`;
-  }
-  return `v${major}.${minor + 1}.0`;
-}
-
 function groupCommits(commits) {
   return commits.reduce((acc, commit) => {
     acc[commit.type] = acc[commit.type] || [];
@@ -111,9 +91,17 @@ function groupCommits(commits) {
 function formatSection(title, commits) {
   if (!commits || commits.length === 0) {
     return '';
-  };
+  }
 
-  const lines = commits.map((c) => `- [${c.raw}](${c.url})`);
+  const lines = commits.map((c) => {
+    const jiraLink = c.ticket ? `${JIRA_BASE_URL}${c.ticket}` : null;
+
+    if (jiraLink) {
+      return `- [${c.raw}](${c.url}) - [JIRA](${jiraLink})`;
+    }
+
+    return `- [${c.raw}](${c.url})`;
+  });
   return `## ${title}\n${lines.join('\n')}\n`;
 }
 
@@ -150,8 +138,46 @@ function writeReleaseNotes(version, grouped) {
   return filePath;
 }
 
-function main() {
-  const lastTag = getLastTag();
+// ============================================================================
+// DELETE THIS SECTION: Test Release Functions (remove when v1 goes to production)
+// ============================================================================
+
+function getLastTestTag() {
+  try {
+    const tags = run('git tag -l "test-v*" --sort=-version:refname');
+    if (tags) {
+      return tags.split('\n')[0];
+    }
+    return null;
+  } catch (err) {
+    return null;
+  }
+}
+
+function nextAvailableTestVersion(baseVersion) {
+  const cleanVersion = baseVersion.replace(/^test-v/, '');
+  const [major, minor, patch] = cleanVersion.split('.').map(Number);
+  
+  for (let candidatePatch = patch; ; candidatePatch += 1) {
+    const candidateTag = `test-v${major}.${minor}.${candidatePatch}`;
+    if (!tagExists(candidateTag)) {
+      return candidateTag;
+    }
+  }
+}
+
+function bumpTestVersion(current, hasHotfix) {
+  const cleanVersion = current ? current.replace(/^test-v/, '') : '1.0.0';
+  const [major, minor, patch] = cleanVersion.split('.').map(Number);
+  
+  if (hasHotfix) {
+    return `test-v${major}.${minor}.${patch + 1}`;
+  }
+  return `test-v${major}.${minor + 1}.0`;
+}
+
+function createTestRelease() {
+  const lastTag = getLastTestTag();
   const repoUrl = getRepoUrl();
   const commits = parseCommits(lastTag, repoUrl);
 
@@ -161,14 +187,87 @@ function main() {
   }
 
   const hasHotfix = commits.some((c) => c.type === 'hotfix');
-  const bumpedVersion = bumpVersion(lastTag || 'v1.0.0', hasHotfix);
-  const nextVersion = nextAvailableVersion(bumpedVersion);
+  const defaultVersion = 'test-v1.0.0';
+  const bumpedVersion = bumpTestVersion(lastTag || defaultVersion, hasHotfix);
+  const nextVersion = nextAvailableTestVersion(bumpedVersion);
   const grouped = groupCommits(commits);
   const notesPath = writeReleaseNotes(nextVersion, grouped);
 
+  console.log(`Release environment: test`);
+  console.log(`Last tag: ${lastTag || 'none'}`);
+  run(`git tag -a ${nextVersion} -m "Release ${nextVersion} (test)"`);
+  console.log(`Created release notes: ${notesPath}`);
+  console.log(`Tagged new version: ${nextVersion}`);
+}
+
+// ============================================================================
+// Production Release Functions
+// ============================================================================
+
+function getLastProductionTag() {
+  try {
+    return run('git describe --tags --abbrev=0');
+  } catch (err) {
+    return null;
+  }
+}
+
+function nextAvailableProductionVersion(baseVersion) {
+  const cleanVersion = baseVersion.replace(/^v/, '');
+  const [major, minor, patch] = cleanVersion.split('.').map(Number);
+  
+  for (let candidatePatch = patch; ; candidatePatch += 1) {
+    const candidateTag = `v${major}.${minor}.${candidatePatch}`;
+    if (!tagExists(candidateTag)) {
+      return candidateTag;
+    }
+  }
+}
+
+function bumpProductionVersion(current, hasHotfix) {
+  const cleanVersion = current ? current.replace(/^v/, '') : '1.0.0';
+  const [major, minor, patch] = cleanVersion.split('.').map(Number);
+  
+  if (hasHotfix) {
+    return `v${major}.${minor}.${patch + 1}`;
+  }
+  return `v${major}.${minor + 1}.0`;
+}
+
+function createProductionRelease() {
+  const lastTag = getLastProductionTag();
+  const repoUrl = getRepoUrl();
+  const commits = parseCommits(lastTag, repoUrl);
+
+  if (commits.length === 0) {
+    console.log('No commits found since last tag. Aborting.');
+    process.exit(1);
+  }
+
+  const hasHotfix = commits.some((c) => c.type === 'hotfix');
+  const defaultVersion = 'v1.0.0';
+  const bumpedVersion = bumpProductionVersion(lastTag || defaultVersion, hasHotfix);
+  const nextVersion = nextAvailableProductionVersion(bumpedVersion);
+  const grouped = groupCommits(commits);
+  const notesPath = writeReleaseNotes(nextVersion, grouped);
+
+  console.log(`Last tag: ${lastTag || 'none'}`);
   run(`git tag -a ${nextVersion} -m "Release ${nextVersion}"`);
   console.log(`Created release notes: ${notesPath}`);
   console.log(`Tagged new version: ${nextVersion}`);
+}
+
+// ============================================================================
+// Main Function
+// ============================================================================
+
+function main() {
+  // DELETE THIS: Remove this if-else and call createProductionRelease() directly when v1 goes to production
+  if (isActiveTestRelease) {
+    createTestRelease();
+  } else {
+    createProductionRelease();
+  }
 }
 
 main();
