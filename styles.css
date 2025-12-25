@@ -5,14 +5,16 @@
 }
 
 body {
-  margin: 0px;
+  margin: 0;
+  line-height: 1.5;
 }
 
 .hero {
   background: linear-gradient(135deg, #2e86de, #54a0ff);
   color: #fff;
-  padding: 3rem 2.5rem;
+  padding: 4rem 2.5rem;
   text-align: center;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 .container {
