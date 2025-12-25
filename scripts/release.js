@@ -7,7 +7,7 @@ const COMMIT_REGEX = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|re
 const JIRA_BASE_URL = process.env.JIRA_BASE_URL || 'https://example.atlassian.net/browse/';
 
 // DELETE THIS SECTION: Remove this constant and all test release functions when v1 goes to production
-const isActiveTestRelease = true;
+const isActiveTestRelease = false;
 
 // Alias mapping: aliases map to their canonical commit types
 const COMMIT_TYPE_ALIASES = {
@@ -206,7 +206,13 @@ function createTestRelease() {
 
 function getLastProductionTag() {
   try {
-    return run('git describe --tags --abbrev=0');
+    const tags = run('git tag -l "v*" --sort=-version:refname');
+    
+    if (tags) {
+      return tags.split('\n')[0];
+    }
+
+    return null;
   } catch (err) {
     return null;
   }
