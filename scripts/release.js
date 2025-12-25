@@ -251,9 +251,16 @@ function createProductionRelease() {
   }
 
   const hasHotfix = commits.some((c) => c.type === 'hotfix');
-  const defaultVersion = 'v1.0.0';
-  const bumpedVersion = bumpProductionVersion(lastTag || defaultVersion, hasHotfix);
-  const nextVersion = nextAvailableProductionVersion(bumpedVersion);
+  
+  let nextVersion;
+  if (!lastTag) {
+    // First production release
+    nextVersion = 'v1.0.0';
+  } else {
+    const bumpedVersion = bumpProductionVersion(lastTag, hasHotfix);
+    nextVersion = nextAvailableProductionVersion(bumpedVersion);
+  }
+  
   const grouped = groupCommits(commits);
   const notesPath = writeReleaseNotes(nextVersion, grouped);
 
